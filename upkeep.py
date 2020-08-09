@@ -47,7 +47,7 @@ class PlaylistMaintenance:
             items.sort(key=lambda date: datetime.strptime(date, '%Y-%m-%dT%H:%M:%SZ'))
             oldest = items[:num]
 
-            # Find the x oldest songs
+            # Find x oldest songs
             for track in pl_items:
                 for dates in oldest:
                     if track['added_at'] == dates:
