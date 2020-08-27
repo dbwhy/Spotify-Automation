@@ -26,8 +26,7 @@ class PlaylistMaintenance:
         for i in response_json['items']:
             if i['name'] == pl_name:
                 return i["id"]
-            else:
-                return None
+        return None
 
     # 2. Finds all playlist items
     def playlist_items(self):
@@ -43,27 +42,39 @@ class PlaylistMaintenance:
 
     # 3. Determine if songs should be removed
     def upkeep(self, pl_items):
-        song_uris = {'tracks': []}
-
-        # how many songs (x) to remove?
+        uris = []
+        # are there songs to remove?
         if (num := (len(pl_items) - 30)) > 0:
             items = {}
-            # Reorder tracks by date
+            artists = {}
             for track in pl_items:
-                items.update({track['added_at']: track['track']['uri']})
+                t = track['track']
+                # have artists been repeated? if so, remove the oldest song from an artist first
+                if (artist := t['artists'][0]['name']) in list(artists.keys()):
+                    if track['added_at'] > artists[artist][0]:
+                        self.remove_song([artists[artist][1]])
+                        return self.playlist_items()
+                    else:
+                        self.remove_song([t['uri']])
+                        return self.playlist_items()
+                else:
+                    artists.update({artist: [(track['added_at']), (t['uri'])]})
+                    items.update({track['added_at']: t['uri']})
+            # re-order songs by 'date added'
             items_dates = list(items.keys())
             items_dates.sort(key=lambda date: datetime.strptime(date, '%Y-%m-%dT%H:%M:%SZ'))
-            oldest = items_dates[:num]
 
-            # Find the x oldest songs
-            for dates in oldest:
-                uri = {'uri': items[dates]}
-                song_uris['tracks'].append(uri)
-
-            self.remove_song(song_uris)
+            for dates in items_dates[:num]:
+                uris.append(items[dates])
+            self.remove_song(uris)
 
     # 4. Remove songs from playlist
-    def remove_song(self, song_uris):
+    def remove_song(self, uris):
+        song_uris = {'tracks': []}
+        for uri in uris:
+            x = {'uri': uri}
+            song_uris['tracks'].append(x)
+
         query = self.spotify_query + f"playlists/{self.pl_id}/tracks/"
         response = requests.delete(
             query,
@@ -95,4 +106,3 @@ class PlaylistMaintenance:
 if __name__ == '__main__':
     pm = PlaylistMaintenance('Current Favorites')
     pm.playlist_items()
-    
