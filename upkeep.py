@@ -11,6 +11,7 @@ class PlaylistMaintenance:
             "Content-Type": "application/json",
             "Authorization": "Bearer {}".format(spotify_token)}
         self.pl_id = self.playlist_id(playlist_name)
+        self.artists = {}
 
     # 1. Find playlist by name and return id
     def playlist_id(self, pl_name):
@@ -37,15 +38,15 @@ class PlaylistMaintenance:
             headers=self.headers
         )
         response_json = response.json()
-        playlist_items = response_json['items']
-        self.upkeep(playlist_items)
+        pl_items = response_json['items']
+        self.upkeep(pl_items)
 
     # 3. Determine if songs should be removed
     def upkeep(self, pl_items):
         # are there songs to remove?
         if (num := (len(pl_items) - 30)) > 0:
-            uris = []
-            items = {}
+            print(num)
+            uris, items = [], {}
             for track in pl_items:
                 if not self.repeat_artist(track):
                     items.update({track['added_at']: track['track']['uri']})
@@ -57,22 +58,25 @@ class PlaylistMaintenance:
             for dates in items_dates[:num]:
                 uris.append(items[dates])
             self.remove_song(uris)
+        else:
+            print('The playlist is has 30 songs!')
+            exit()
 
     # 4. Have artists been repeated? if so, remove the oldest song from an artist
     def repeat_artist(self, track):
         t = track['track']
-        artists = {}
         # has artist been found on this playlist?
-        if (a := t['artists'][0]['name']) in list(artists.keys()):
+        if (a := t['artists'][0]['name']) in list(self.artists.keys()):
+            print(a)
             # which song of theirs was added first?
-            if track['added_at'] > artists[a][0]:
-                self.remove_song([artists[a][1]])
-                return self.playlist_items()
+            if track['added_at'] > self.artists[a][0]:
+                print(self.artists[a][1])
+                self.remove_song([self.artists[a][1]])
             else:
+                print(t['uri'])
                 self.remove_song([t['uri']])
-                return self.playlist_items()
         else:
-            artists.update({a: [track['added_at'], t['uri']]})
+            self.artists.update({a: [track['added_at'], t['uri']]})
             return False
 
     # 5. Remove songs from playlist
@@ -108,6 +112,8 @@ class PlaylistMaintenance:
         )
         if response.status_code != 201:
             raise Exception(response.status_code)
+        
+        self.playlist_items()
 
 
 if __name__ == '__main__':
